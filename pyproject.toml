@@ -1,0 +1,13 @@
+[project]
+name = "applyflow"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pydantic>=2.12.5",
+    "pytest>=9.0.2",
+    "requests>=2.32.5",
+    "sentence-transformers>=5.2.3",
+    "streamlit>=1.54.0",
+]
