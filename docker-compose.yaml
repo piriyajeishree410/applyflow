@@ -1,0 +1,16 @@
+
+services:
+  db:
+    image: postgres:16
+    container_name: applyflow_db
+    environment:
+      POSTGRES_DB: applyflow
+      POSTGRES_USER: applyflow
+      POSTGRES_PASSWORD: applyflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

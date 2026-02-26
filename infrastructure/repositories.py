@@ -1,52 +1,93 @@
 import json
 from datetime import datetime
-from domain.job import Job
+
 from domain.application import Application, ApplicationStatus
+from domain.job import Job
 from domain.scoring import ScoreResult
-from infrastructure.database import get_connection
+from infrastructure.database import USE_POSTGRES, get_connection
+
+
+def _ph() -> str:
+    """Return the correct placeholder for the active DB driver."""
+    return "%s" if USE_POSTGRES else "?"
+
+
+def _cursor(conn):
+    """Return a dict-row cursor for Postgres; plain conn for SQLite."""
+    if USE_POSTGRES:
+        import psycopg2.extras
+        return conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    return conn  # SQLite uses conn directly with row_factory
 
 
 class JobRepository:
     def save(self, job: Job) -> bool:
-        """Insert job. Returns False if job already exists (dedup)."""
-        with get_connection() as conn:
-            existing = conn.execute(
-                "SELECT id FROM jobs WHERE id = ?", (job.id,)
-            ).fetchone()
-            if existing:
-                return False  # duplicate — silent skip
+        ph = _ph()
+        conn = get_connection()
+        try:
+            cur = conn.cursor() if USE_POSTGRES else conn
+            if USE_POSTGRES:
+                cur.execute(f"SELECT id FROM jobs WHERE id = {ph}", (job.id,))
+                exists = cur.fetchone()
+            else:
+                exists = conn.execute(
+                    f"SELECT id FROM jobs WHERE id = {ph}", (job.id,)
+                ).fetchone()
 
-            conn.execute("""
+            if exists:
+                return False
+
+            params = (
+                job.id, job.title, job.company, job.location,
+                job.description, json.dumps(job.required_skills),
+                job.required_years, job.source, job.source_url,
+                int(job.remote), job.created_at.isoformat(),
+            )
+            sql = f"""
                 INSERT INTO jobs
                     (id, title, company, location, description,
                      required_skills, required_years, source, source_url,
                      remote, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                job.id,
-                job.title,
-                job.company,
-                job.location,
-                job.description,
-                json.dumps(job.required_skills),
-                job.required_years,
-                job.source,
-                job.source_url,
-                int(job.remote),
-                job.created_at.isoformat(),
-            ))
+                VALUES ({','.join([ph]*11)})
+            """
+            if USE_POSTGRES:
+                cur.execute(sql, params)
+                conn.commit()
+            else:
+                conn.execute(sql, params)
             return True
+        finally:
+            if USE_POSTGRES:
+                conn.close()
 
     def get_all(self) -> list[Job]:
-        with get_connection() as conn:
-            rows = conn.execute(
-                "SELECT * FROM jobs ORDER BY created_at DESC"
-            ).fetchall()
+        conn = get_connection()
+        try:
+            sql = "SELECT * FROM jobs ORDER BY created_at DESC"
+            if USE_POSTGRES:
+                import psycopg2.extras
+                cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                cur.execute(sql)
+                rows = cur.fetchall()
+            else:
+                rows = conn.execute(sql).fetchall()
             return [self._row_to_job(r) for r in rows]
+        finally:
+            if USE_POSTGRES:
+                conn.close()
 
     def count(self) -> int:
-        with get_connection() as conn:
-            return conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        conn = get_connection()
+        try:
+            if USE_POSTGRES:
+                cur = conn.cursor()
+                cur.execute("SELECT COUNT(*) FROM jobs")
+                return cur.fetchone()[0]
+            else:
+                return conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        finally:
+            if USE_POSTGRES:
+                conn.close()
 
     def _row_to_job(self, row) -> Job:
         return Job(
@@ -65,58 +106,96 @@ class JobRepository:
 
 class ApplicationRepository:
     def save(self, app: Application, result: ScoreResult) -> None:
-        """Insert or update an application with its score result."""
-        with get_connection() as conn:
-            existing = conn.execute(
-                "SELECT id FROM applications WHERE job_id = ?", (app.job_id,)
-            ).fetchone()
+        ph = _ph()
+        conn = get_connection()
+        try:
+            if USE_POSTGRES:
+                cur = conn.cursor()
+                cur.execute(
+                    f"SELECT id FROM applications WHERE job_id = {ph}",
+                    (app.job_id,)
+                )
+                exists = cur.fetchone()
+            else:
+                exists = conn.execute(
+                    f"SELECT id FROM applications WHERE job_id = {ph}",
+                    (app.job_id,)
+                ).fetchone()
 
-            if existing:
-                conn.execute("""
+            now = datetime.utcnow().isoformat()
+
+            if exists:
+                sql = f"""
                     UPDATE applications
-                    SET status=?, match_score=?, missing_skills=?,
-                        matched_skills=?, experience_gap=?, updated_at=?
-                    WHERE job_id=?
-                """, (
-                    app.status.value,
-                    result.final_score,
+                    SET status={ph}, match_score={ph}, missing_skills={ph},
+                        matched_skills={ph}, experience_gap={ph}, updated_at={ph}
+                    WHERE job_id={ph}
+                """
+                params = (
+                    app.status.value, result.final_score,
                     json.dumps(result.missing_skills),
                     json.dumps(result.matched_skills),
-                    result.experience_gap,
-                    datetime.utcnow().isoformat(),
-                    app.job_id,
-                ))
+                    result.experience_gap, now, app.job_id,
+                )
             else:
-                conn.execute("""
+                sql = f"""
                     INSERT INTO applications
                         (job_id, status, match_score, missing_skills,
                          matched_skills, experience_gap, notes, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    app.job_id,
-                    app.status.value,
-                    result.final_score,
+                    VALUES ({','.join([ph]*8)})
+                """
+                params = (
+                    app.job_id, app.status.value, result.final_score,
                     json.dumps(result.missing_skills),
                     json.dumps(result.matched_skills),
-                    result.experience_gap,
-                    app.notes,
-                    datetime.utcnow().isoformat(),
-                ))
+                    result.experience_gap, app.notes, now,
+                )
+
+            if USE_POSTGRES:
+                cur.execute(sql, params)
+                conn.commit()
+            else:
+                conn.execute(sql, params)
+        finally:
+            if USE_POSTGRES:
+                conn.close()
 
     def get_all(self) -> list[dict]:
-        with get_connection() as conn:
-            rows = conn.execute("""
+        conn = get_connection()
+        try:
+            sql = """
                 SELECT a.*, j.title, j.company, j.location, j.source_url
                 FROM applications a
                 JOIN jobs j ON a.job_id = j.id
                 ORDER BY a.match_score DESC
-            """).fetchall()
-            return [dict(r) for r in rows]
+            """
+            if USE_POSTGRES:
+                import psycopg2.extras
+                cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                cur.execute(sql)
+                return [dict(r) for r in cur.fetchall()]
+            else:
+                rows = conn.execute(sql).fetchall()
+                return [dict(r) for r in rows]
+        finally:
+            if USE_POSTGRES:
+                conn.close()
 
     def update_status(self, job_id: str, status: ApplicationStatus) -> None:
-        with get_connection() as conn:
-            conn.execute("""
-                UPDATE applications
-                SET status=?, updated_at=?
-                WHERE job_id=?
-            """, (status.value, datetime.utcnow().isoformat(), job_id))
+        ph = _ph()
+        conn = get_connection()
+        try:
+            sql = f"""
+                UPDATE applications SET status={ph}, updated_at={ph}
+                WHERE job_id={ph}
+            """
+            params = (status.value, datetime.utcnow().isoformat(), job_id)
+            if USE_POSTGRES:
+                cur = conn.cursor()
+                cur.execute(sql, params)
+                conn.commit()
+            else:
+                conn.execute(sql, params)
+        finally:
+            if USE_POSTGRES:
+                conn.close()
