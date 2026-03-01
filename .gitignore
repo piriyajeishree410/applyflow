@@ -8,3 +8,9 @@ data/
 .env
 .venv/
 .env
+# Terraform
+infra/.terraform/
+infra/.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+infra/task-def.json
