@@ -31,7 +31,7 @@ KNOWN_SKILLS = [
 # Regex to extract years of experience — matches patterns like:
 # "3+ years", "2-4 years", "5 years of experience"
 YOE_PATTERN = re.compile(
-    r"(\d+)\+?\s*(?:to|-)\s*\d*\s*years?|(\d+)\+?\s*years?\s*(?:of\s+)?experience",
+    r"(\d+)\+?\s*(?:to|-)\s*\d*\s*years?|(\d+)\+?\s*years?(?:\s+(?:of\s+)?experience)?",
     re.IGNORECASE,
 )
 

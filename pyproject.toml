@@ -12,3 +12,8 @@ dependencies = [
     "sentence-transformers>=5.2.3",
     "streamlit>=1.54.0",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.4",
+]
