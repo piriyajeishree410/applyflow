@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from domain.job import Job
 from domain.resume import ResumeProfile
 

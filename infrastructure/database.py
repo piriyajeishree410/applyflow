@@ -57,7 +57,6 @@ def get_connection():
 
 def init_db() -> None:
     if USE_POSTGRES:
-        import psycopg2
         conn = get_connection()
         with conn.cursor() as cur:
             # Postgres uses SERIAL not AUTOINCREMENT
