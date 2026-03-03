@@ -9,6 +9,23 @@ USE_POSTGRES = DATABASE_URL.startswith("postgresql")
 
 SQLITE_PATH = Path("data/applyflow.db")
 
+CREATE_PROFILES_TABLE = """
+    CREATE TABLE IF NOT EXISTS search_profiles (
+        user_id             TEXT PRIMARY KEY,
+        name                TEXT NOT NULL,
+        role_keywords       TEXT,
+        required_stack      TEXT,
+        preferred_stack     TEXT,
+        experience_level    TEXT DEFAULT 'entry',
+        location_pref       TEXT DEFAULT 'any',
+        min_match_score     REAL DEFAULT 0.0,
+        active              INTEGER DEFAULT 1,
+        skills              TEXT,
+        experience_years    INTEGER DEFAULT 0,
+        certifications      TEXT
+    );
+"""
+
 CREATE_JOBS_TABLE = """
     CREATE TABLE IF NOT EXISTS jobs (
         id              TEXT PRIMARY KEY,
@@ -57,11 +74,13 @@ def get_connection():
 
 def init_db() -> None:
     if USE_POSTGRES:
+        import psycopg2
         conn = get_connection()
         with conn.cursor() as cur:
             # Postgres uses SERIAL not AUTOINCREMENT
             jobs_ddl = CREATE_JOBS_TABLE
             apps_ddl = CREATE_APPLICATIONS_TABLE
+            cur.execute(CREATE_PROFILES_TABLE)
             cur.execute(jobs_ddl)
             cur.execute(apps_ddl)
         conn.commit()

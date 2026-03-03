@@ -49,6 +49,21 @@ resource "aws_iam_role_policy" "ecs_task_s3" {
   })
 }
 
+# Allow task to publish CloudWatch metrics
+resource "aws_iam_role_policy" "ecs_task_cloudwatch" {
+  name = "${var.project}-task-cloudwatch"
+  role = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["cloudwatch:PutMetricData"]
+      Resource = "*"
+    }]
+  })
+}
+
 # EventBridge role — allows it to trigger ECS tasks
 resource "aws_iam_role" "eventbridge" {
   name = "${var.project}-eventbridge"

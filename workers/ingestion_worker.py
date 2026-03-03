@@ -1,4 +1,5 @@
 import logging
+import time
 
 from domain.application import Application
 from domain.resume import ResumeProfile
@@ -7,6 +8,7 @@ from infrastructure.database import init_db
 from infrastructure.repositories import ApplicationRepository, JobRepository
 from services.collectors.base import JobCollector
 from services.parser import extract_skills, extract_years
+from monitoring import metrics
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +16,7 @@ logger = logging.getLogger(__name__)
 class IngestionWorker:
     """
     Orchestrates the full ingest → parse → score → persist pipeline.
-    Decoupled from any specific collector or schedule mechanism.
+    Publishes CloudWatch metrics on every run.
     """
 
     def __init__(
@@ -32,13 +34,15 @@ class IngestionWorker:
     def run(self) -> dict:
         """Run one full ingestion cycle. Returns a summary dict."""
         init_db()
+        start = time.time()
 
-        saved = skipped_dup = failed = 0
+        saved = skipped_dup = failed = total_fetched = 0
 
         for collector in self.collectors:
             name = collector.__class__.__name__
             try:
                 jobs = collector.fetch()
+                total_fetched += len(jobs)
                 logger.info(f"[worker] {name}: fetched {len(jobs)} jobs")
             except Exception as e:
                 logger.error(f"[worker] {name}: fetch failed — {e}")
@@ -47,7 +51,6 @@ class IngestionWorker:
 
             for job in jobs:
                 try:
-                    # Parse from full description
                     job.required_skills = extract_skills(job.description)
                     job.required_years = extract_years(job.description)
 
@@ -67,10 +70,24 @@ class IngestionWorker:
                     logger.warning(f"[worker] job processing failed: {e}")
                     failed += 1
 
+        duration = time.time() - start
+
+        # Publish CloudWatch metrics
+        metrics.record_jobs_fetched(total_fetched)
+        metrics.record_jobs_saved(saved)
+        metrics.record_duplicates_skipped(skipped_dup)
+        metrics.record_failures(failed)
+        metrics.record_ingestion_duration(duration)
+
+        if failed == 0:
+            metrics.record_last_successful_run()
+
         summary = {
             "saved": saved,
             "skipped_dup": skipped_dup,
             "failed": failed,
+            "total_fetched": total_fetched,
+            "duration_seconds": round(duration, 1),
             "total_in_db": self.job_repo.count(),
         }
         logger.info(f"[worker] cycle complete: {summary}")

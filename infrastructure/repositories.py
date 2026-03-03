@@ -3,6 +3,7 @@ from datetime import datetime
 
 from domain.application import Application, ApplicationStatus
 from domain.job import Job
+from domain.profile import SearchProfile, ExperienceLevel, LocationPref
 from domain.scoring import ScoreResult
 from infrastructure.database import USE_POSTGRES, get_connection
 
@@ -199,3 +200,109 @@ class ApplicationRepository:
         finally:
             if USE_POSTGRES:
                 conn.close()
+
+
+class ProfileRepository:
+    def save(self, profile: SearchProfile) -> None:
+        ph = _ph()
+        conn = get_connection()
+        try:
+            sql = f"""
+                INSERT INTO search_profiles
+                    (user_id, name, role_keywords, required_stack, preferred_stack,
+                     experience_level, location_pref, min_match_score, active,
+                     skills, experience_years, certifications)
+                VALUES ({','.join([ph]*12)})
+                ON CONFLICT (user_id) DO UPDATE SET
+                    name=EXCLUDED.name,
+                    role_keywords=EXCLUDED.role_keywords,
+                    required_stack=EXCLUDED.required_stack,
+                    preferred_stack=EXCLUDED.preferred_stack,
+                    experience_level=EXCLUDED.experience_level,
+                    location_pref=EXCLUDED.location_pref,
+                    min_match_score=EXCLUDED.min_match_score,
+                    active=EXCLUDED.active,
+                    skills=EXCLUDED.skills,
+                    experience_years=EXCLUDED.experience_years,
+                    certifications=EXCLUDED.certifications
+            """ if USE_POSTGRES else f"""
+                INSERT OR REPLACE INTO search_profiles
+                    (user_id, name, role_keywords, required_stack, preferred_stack,
+                     experience_level, location_pref, min_match_score, active,
+                     skills, experience_years, certifications)
+                VALUES ({','.join([ph]*12)})
+            """
+            params = (
+                profile.user_id, profile.name,
+                json.dumps(profile.role_keywords),
+                json.dumps(profile.required_stack),
+                json.dumps(profile.preferred_stack),
+                profile.experience_level.value,
+                profile.location_pref.value,
+                profile.min_match_score,
+                int(profile.active),
+                json.dumps(profile.skills),
+                profile.experience_years,
+                json.dumps(profile.certifications),
+            )
+            if USE_POSTGRES:
+                cur = conn.cursor()
+                cur.execute(sql, params)
+                conn.commit()
+            else:
+                conn.execute(sql, params)
+        finally:
+            if USE_POSTGRES:
+                conn.close()
+
+    def get(self, user_id: str) -> SearchProfile | None:
+        ph = _ph()
+        conn = get_connection()
+        try:
+            if USE_POSTGRES:
+                import psycopg2.extras
+                cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                cur.execute(
+                    f"SELECT * FROM search_profiles WHERE user_id = {ph}", (user_id,)
+                )
+                row = cur.fetchone()
+            else:
+                row = conn.execute(
+                    f"SELECT * FROM search_profiles WHERE user_id = {ph}", (user_id,)
+                ).fetchone()
+            return self._row_to_profile(dict(row)) if row else None
+        finally:
+            if USE_POSTGRES:
+                conn.close()
+
+    def get_all_active(self) -> list[SearchProfile]:
+        conn = get_connection()
+        try:
+            sql = "SELECT * FROM search_profiles WHERE active = 1"
+            if USE_POSTGRES:
+                import psycopg2.extras
+                cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                cur.execute(sql)
+                rows = cur.fetchall()
+            else:
+                rows = conn.execute(sql).fetchall()
+            return [self._row_to_profile(dict(r)) for r in rows]
+        finally:
+            if USE_POSTGRES:
+                conn.close()
+
+    def _row_to_profile(self, row: dict) -> SearchProfile:
+        return SearchProfile(
+            user_id=row["user_id"],
+            name=row["name"],
+            role_keywords=json.loads(row["role_keywords"] or "[]"),
+            required_stack=json.loads(row["required_stack"] or "[]"),
+            preferred_stack=json.loads(row["preferred_stack"] or "[]"),
+            experience_level=ExperienceLevel(row["experience_level"]),
+            location_pref=LocationPref(row["location_pref"]),
+            min_match_score=row["min_match_score"],
+            active=bool(row["active"]),
+            skills=json.loads(row["skills"] or "[]"),
+            experience_years=row["experience_years"],
+            certifications=json.loads(row["certifications"] or "[]"),
+        )

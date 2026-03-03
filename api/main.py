@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from infrastructure.database import init_db, get_connection, USE_POSTGRES
 from infrastructure.repositories import JobRepository, ApplicationRepository
-from api.routes import jobs, applications, analytics
+from api.routes import jobs, applications, analytics, profiles
 
 app = FastAPI(title="ApplyFlow API", version="1.0.0")
 
@@ -18,6 +18,7 @@ app.add_middleware(
 app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 app.include_router(applications.router, prefix="/applications", tags=["applications"])
 app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+app.include_router(profiles.router, prefix="/profiles", tags=["profiles"])
 
 
 @app.on_event("startup")
