@@ -62,7 +62,7 @@ CREATE_APPLICATIONS_TABLE = """
 def get_connection():
     if USE_POSTGRES:
         import psycopg2
-        import psycopg2.extras
+        # import psycopg2.extras
         conn = psycopg2.connect(DATABASE_URL)
         return conn
     else:
