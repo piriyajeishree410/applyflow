@@ -14,3 +14,4 @@ infra/.terraform.lock.hcl
 *.tfstate
 *.tfstate.backup
 infra/task-def.json
+.streamlit/secrets.toml

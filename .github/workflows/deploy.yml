@@ -62,9 +62,32 @@ jobs:
           container-name: ${{ env.CONTAINER_NAME }}
           image: ${{ steps.build.outputs.image }}
 
-      - name: Deploy to ECS
+      - name: Deploy worker task to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: ${{ steps.task-def.outputs.task-definition }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: false
+
+      - name: Download API task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${ECS_TASK_FAMILY}-api \
+            --query taskDefinition \
+            > api-task-def.json
+
+      - name: Update image in API task definition
+        id: api-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: api-task-def.json
+          container-name: ${{ env.CONTAINER_NAME }}-api
+          image: ${{ steps.build.outputs.image }}
+
+      - name: Deploy API service to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.api-task-def.outputs.task-definition }}
+          service: applyflow-api
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: false
