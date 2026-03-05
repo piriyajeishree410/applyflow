@@ -7,23 +7,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-
-# Copy dependency files
-COPY pyproject.toml uv.lock ./
-
-# Install only what the worker needs — no PyTorch/sentence-transformers
-RUN uv pip install --system \
+# Install all dependencies directly into system Python
+RUN pip install --no-cache-dir \
     requests \
     pydantic \
-    psycopg2-binary
+    psycopg2-binary \
+    fastapi \
+    "uvicorn[standard]" \
+    boto3
 
 # Copy application source
 COPY domain/         ./domain/
 COPY services/       ./services/
 COPY infrastructure/ ./infrastructure/
 COPY workers/        ./workers/
+COPY monitoring/     ./monitoring/
+COPY api/            ./api/
 COPY config/         ./config/
 COPY main.py         ./main.py
 
