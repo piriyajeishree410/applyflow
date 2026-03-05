@@ -34,7 +34,7 @@ resource "aws_ecs_task_definition" "api" {
     image = "${aws_ecr_repository.applyflow.repository_url}:latest"
 
     command = [
-      "uvicorn", "api.main:app",
+      "python", "-m", "uvicorn", "api.main:app",
       "--host", "0.0.0.0",
       "--port", "8000"
     ]
