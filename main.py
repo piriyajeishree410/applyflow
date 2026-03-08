@@ -4,6 +4,9 @@ from domain.resume import ResumeProfile
 from infrastructure.database import init_db
 from infrastructure.repositories import ApplicationRepository, ProfileRepository
 from services.collectors.greenhouse import GreenhouseCollector
+from services.collectors.lever import LeverCollector
+from services.collectors.rss import RSSCollector
+from services.collectors.remotive import RemotiveCollector
 from workers.ingestion_worker import IngestionWorker
 
 logging.basicConfig(
@@ -60,7 +63,11 @@ def main():
     logger.info(f"Tracking {len(companies)} companies: {companies}")
 
     worker = IngestionWorker(
-        collectors=[GreenhouseCollector(companies=companies)],
+        collectors=[
+            GreenhouseCollector(companies=companies),
+            RemotiveCollector(),
+            RSSCollector(),
+        ],
         resume=resume,
     )
     summary = worker.run()

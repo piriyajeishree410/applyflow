@@ -31,3 +31,4 @@ class SearchProfile:
     skills: list[str] = field(default_factory=list)
     experience_years: int = 0
     certifications: list[str] = field(default_factory=list)
+    companies: list[str] = field(default_factory=list)  # companies to track
