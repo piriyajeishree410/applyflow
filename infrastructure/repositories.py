@@ -211,8 +211,8 @@ class ProfileRepository:
                 INSERT INTO search_profiles
                     (user_id, name, role_keywords, required_stack, preferred_stack,
                      experience_level, location_pref, min_match_score, active,
-                     skills, experience_years, certifications)
-                VALUES ({','.join([ph]*12)})
+                     skills, experience_years, certifications, companies)
+                VALUES ({','.join([ph]*13)})
                 ON CONFLICT (user_id) DO UPDATE SET
                     name=EXCLUDED.name,
                     role_keywords=EXCLUDED.role_keywords,
@@ -224,13 +224,14 @@ class ProfileRepository:
                     active=EXCLUDED.active,
                     skills=EXCLUDED.skills,
                     experience_years=EXCLUDED.experience_years,
-                    certifications=EXCLUDED.certifications
+                    certifications=EXCLUDED.certifications,
+                    companies=EXCLUDED.companies
             """ if USE_POSTGRES else f"""
                 INSERT OR REPLACE INTO search_profiles
                     (user_id, name, role_keywords, required_stack, preferred_stack,
                      experience_level, location_pref, min_match_score, active,
-                     skills, experience_years, certifications)
-                VALUES ({','.join([ph]*12)})
+                     skills, experience_years, certifications, companies)
+                VALUES ({','.join([ph]*13)})
             """
             params = (
                 profile.user_id, profile.name,
@@ -244,6 +245,7 @@ class ProfileRepository:
                 json.dumps(profile.skills),
                 profile.experience_years,
                 json.dumps(profile.certifications),
+                json.dumps(profile.companies),
             )
             if USE_POSTGRES:
                 cur = conn.cursor()
@@ -305,4 +307,5 @@ class ProfileRepository:
             skills=json.loads(row["skills"] or "[]"),
             experience_years=row["experience_years"],
             certifications=json.loads(row["certifications"] or "[]"),
+            companies=json.loads(row.get("companies") or "[]"),
         )

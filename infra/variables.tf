@@ -1,3 +1,8 @@
+variable "ec2_key_name" {
+  description = "EC2 key pair name for SSH access"
+  default     = ""
+}
+
 variable "aws_region" {
   default = "us-east-1"
 }

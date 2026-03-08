@@ -1,7 +1,8 @@
 import logging
 
 from domain.resume import ResumeProfile
-from infrastructure.repositories import ApplicationRepository
+from infrastructure.database import init_db
+from infrastructure.repositories import ApplicationRepository, ProfileRepository
 from services.collectors.greenhouse import GreenhouseCollector
 from workers.ingestion_worker import IngestionWorker
 
@@ -11,7 +12,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-MY_RESUME = ResumeProfile(
+# Fallback resume — used if no profile exists in DB yet
+DEFAULT_RESUME = ResumeProfile(
     name="Piriyajeishree",
     skills=[
         "docker", "terraform", "aws", "python", "github actions",
@@ -23,7 +25,7 @@ MY_RESUME = ResumeProfile(
     certifications=["AWS Certified Cloud Practitioner"],
 )
 
-COMPANIES = [
+DEFAULT_COMPANIES = [
     "cloudflare",
     "datadog",
     "elastic",
@@ -33,10 +35,33 @@ COMPANIES = [
 
 def main():
     logger.info("=== ApplyFlow pipeline starting ===")
+    init_db()
+
+    # Load profile from DB if available
+    profile_repo = ProfileRepository()
+    profiles = profile_repo.get_all_active()
+
+    if profiles:
+        profile = profiles[0]
+        logger.info(f"Using profile: {profile.name}")
+        resume = ResumeProfile(
+            name=profile.name,
+            skills=profile.skills,
+            experience_years=profile.experience_years,
+            domains=["SRE", "DevOps", "Cloud"],
+            certifications=profile.certifications,
+        )
+        companies = profile.companies if profile.companies else DEFAULT_COMPANIES
+    else:
+        logger.info("No profile found — using defaults")
+        resume = DEFAULT_RESUME
+        companies = DEFAULT_COMPANIES
+
+    logger.info(f"Tracking {len(companies)} companies: {companies}")
 
     worker = IngestionWorker(
-        collectors=[GreenhouseCollector(companies=COMPANIES)],
-        resume=MY_RESUME,
+        collectors=[GreenhouseCollector(companies=companies)],
+        resume=resume,
     )
     summary = worker.run()
 
@@ -46,7 +71,6 @@ def main():
     logger.info(f"  Failed:        {summary['failed']}")
     logger.info(f"  Total in DB:   {summary['total_in_db']}")
 
-    # Preview top 5
     print("\n── Top 5 matches ──────────────────────────────")
     for a in ApplicationRepository().get_all()[:5]:
         print(

@@ -18,6 +18,7 @@ class ProfileCreate(BaseModel):
     skills: list[str] = []
     experience_years: int = 0
     certifications: list[str] = []
+    companies: list[str] = []
 
 
 @router.post("")
@@ -35,6 +36,30 @@ def create_profile(body: ProfileCreate):
             skills=body.skills,
             experience_years=body.experience_years,
             certifications=body.certifications,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    ProfileRepository().save(profile)
+    return {"user_id": body.user_id, "created": True}
+
+
+@router.post("")
+def create_profile(body: ProfileCreate):
+    try:
+        profile = SearchProfile(
+            user_id=body.user_id,
+            name=body.name,
+            role_keywords=body.role_keywords,
+            required_stack=body.required_stack,
+            preferred_stack=body.preferred_stack,
+            experience_level=ExperienceLevel(body.experience_level),
+            location_pref=LocationPref(body.location_pref),
+            min_match_score=body.min_match_score,
+            skills=body.skills,
+            experience_years=body.experience_years,
+            certifications=body.certifications,
+            companies=body.companies,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

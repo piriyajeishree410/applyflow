@@ -1,9 +1,24 @@
 import subprocess
 import sys
+import requests as http_requests
 from fastapi import APIRouter, Query
 from infrastructure.repositories import ApplicationRepository
 
 router = APIRouter()
+
+
+@router.get("/check-company")
+def check_company(name: str = Query(...)):
+    """Check if a company has a Greenhouse job board."""
+    try:
+        url = f"https://boards-api.greenhouse.io/v1/boards/{name.lower()}/jobs"
+        r = http_requests.get(url, timeout=5)
+        if r.status_code == 200:
+            count = r.json().get("total", 0)
+            return {"found": True, "company": name.lower(), "job_count": count}
+        return {"found": False, "company": name.lower(), "job_count": 0}
+    except Exception:
+        return {"found": False, "company": name.lower(), "job_count": 0}
 
 
 @router.get("")

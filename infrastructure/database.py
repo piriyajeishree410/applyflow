@@ -22,7 +22,8 @@ CREATE_PROFILES_TABLE = """
         active              INTEGER DEFAULT 1,
         skills              TEXT,
         experience_years    INTEGER DEFAULT 0,
-        certifications      TEXT
+        certifications      TEXT,
+        companies           TEXT
     );
 """
 
@@ -62,7 +63,7 @@ CREATE_APPLICATIONS_TABLE = """
 def get_connection():
     if USE_POSTGRES:
         import psycopg2
-        # import psycopg2.extras
+        import psycopg2.extras
         conn = psycopg2.connect(DATABASE_URL)
         return conn
     else:
