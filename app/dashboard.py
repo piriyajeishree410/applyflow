@@ -6,7 +6,7 @@ import requests
 # ── Config ────────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="ApplyFlow",
-    page_icon="🚀",
+    page_icon="👾",
     layout="wide",
 )
 
@@ -23,7 +23,7 @@ def check_password():
         [data-testid="stSidebar"] {display: none}
         </style>
     """, unsafe_allow_html=True)
-    st.title("🚀 ApplyFlow")
+    st.title("👾 ApplyFlow")
     st.subheader("Login")
     pwd = st.text_input("Password", type="password")
     if st.button("Login"):
@@ -66,7 +66,7 @@ def api_patch(path, data=None):
         return None
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
-st.sidebar.title("🚀 ApplyFlow")
+st.sidebar.title("👾 ApplyFlow")
 st.sidebar.caption("Job application pipeline")
 
 page = st.sidebar.radio(
@@ -95,6 +95,37 @@ if health:
 if page == "👤 My Profile":
     st.title("👤 My Profile")
     existing = api_get(f"/profiles/{USER_ID}")
+
+    # ── Company search (outside form) ─────────────────────────────────────────
+    st.subheader("🏢 Company Search")
+    st.caption("Check if any company uses Greenhouse before adding them")
+    search_col, btn_col = st.columns([3, 1])
+    with search_col:
+        company_search = st.text_input(
+            "Search company",
+            placeholder="e.g. stripe, figma, notion, airbnb...",
+            label_visibility="collapsed"
+        )
+    with btn_col:
+        check_btn = st.button("Check", use_container_width=True)
+
+    if check_btn and company_search:
+        result = api_get(
+            "/jobs/check-company",
+            params={"name": company_search.strip().lower()}
+        )
+        if result and result["found"]:
+            st.success(
+                f"✅ {company_search} uses Greenhouse — "
+                f"{result['job_count']} jobs available. Add it below!"
+            )
+        elif result:
+            st.error(
+                f"❌ {company_search} not found on Greenhouse. "
+                "Try a different name."
+            )
+
+    st.divider()
 
     with st.form("profile_form"):
         st.subheader("Basic Info")
@@ -141,35 +172,7 @@ if page == "👤 My Profile":
         )
 
         st.subheader("🏢 Companies to Track")
-        st.caption("Search for any company that uses Greenhouse for hiring")
-
-        # Company search
-        search_col, btn_col = st.columns([3, 1])
-        with search_col:
-            company_search = st.text_input(
-                "Search company",
-                placeholder="e.g. stripe, figma, notion, airbnb...",
-                key="company_search",
-                label_visibility="collapsed"
-            )
-        with btn_col:
-            check_btn = st.button("Check", use_container_width=True)
-
-        if check_btn and company_search:
-            result = api_get(
-                "/jobs/check-company",
-                params={"name": company_search.strip().lower()}
-            )
-            if result and result["found"]:
-                st.success(
-                    f"✅ {company_search} uses Greenhouse — "
-                    f"{result['job_count']} jobs available. Add it below!"
-                )
-            elif result:
-                st.error(
-                    f"❌ {company_search} not found on Greenhouse. "
-                    "Try a different name (use their careers page URL slug)."
-                )
+        st.caption("Add companies from your search above")
 
         default_companies = ", ".join(existing["companies"]) if existing and existing.get("companies") \
             else "cloudflare, datadog, elastic, mongodb"
@@ -251,7 +254,7 @@ if page == "👤 My Profile":
 
 # ── Job Feed Page ─────────────────────────────────────────────────────────────
 elif page == "🔍 Job Feed":
-    st.title("🚀 ApplyFlow")
+    st.title("👾 ApplyFlow")
 
     # Metrics
     analytics = api_get("/analytics/conversion") or {}
